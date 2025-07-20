@@ -1,29 +1,935 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hacker News</title>
-
-    <link rel="stylesheet" href="./css/style.css">
+    <title>Hacker News Reader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .comment-children {
+            margin-left: 1.5rem;
+            border-left: 2px solid #e5e7eb;
+            padding-left: 1rem;
+        }
+        .comment-text {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+            min-width: 100%;
+            max-width: none;
+        }
+        .comment-container {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e0 #f7fafc;
+        }
+        .comment-container::-webkit-scrollbar {
+            height: 6px;
+        }
+        .comment-container::-webkit-scrollbar-track {
+            background: #f7fafc;
+            border-radius: 3px;
+        }
+        .comment-container::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 3px;
+        }
+        .comment-container::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0;
+        }
+        .scrollable-indicator {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 20px;
+            height: 20px;
+            background-color: #ef4444;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+    </style>
 </head>
-
-<body>
-    <div class="wrapper">
-        <header>
-            <div class="container"></div>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="bg-orange-500 text-white rounded-lg shadow-md mb-8">
+            <div class="flex items-center justify-between p-4">
+                <div class="flex items-center space-x-4">
+                    <div class="text-2xl font-bold">HN</div>
+                    <h1 class="text-xl font-bold">Hacker News Reader</h1>
+                </div>
+                <div class="relative">
+                    <button id="liveUpdatesBtn" class="bg-white text-orange-500 px-4 py-2 rounded-md font-medium flex items-center">
+                        <i class="fas fa-bell mr-2"></i> Live Updates
+                        <div id="notificationBadge" class="notification-badge hidden">0</div>
+                    </button>
+                </div>
+            </div>
+            <nav class="flex border-t border-orange-600">
+                <button data-type="top" class="tab-btn flex-1 py-2 text-center font-medium hover:bg-orange-600">Top Stories</button>
+                <button data-type="new" class="tab-btn flex-1 py-2 text-center font-medium hover:bg-orange-600">New Stories</button>
+                <button data-type="ask" class="tab-btn flex-1 py-2 text-center font-medium hover:bg-orange-600">Ask HN</button>
+                <button data-type="show" class="tab-btn flex-1 py-2 text-center font-medium hover:bg-orange-600">Show HN</button>
+                <button data-type="poll" class="tab-btn flex-1 py-2 text-center font-medium hover:bg-orange-600">Polls</button>
+                <button data-type="job" class="tab-btn flex-1 py-2 text-center font-medium hover:bg-orange-600">Jobs</button>
+            </nav>
         </header>
-        <main>
-            <div class="container"></div>
-        </main>
-        <footer>
-            <div class="container"></div>
-        </footer>
+
+        <!-- Main Content -->
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- Posts Section -->
+            <main class="lg:w-2/3">
+                <div id="postsContainer" class="space-y-4">
+                    <!-- Posts will be loaded here -->
+                </div>
+                <div id="loadingSpinner" class="flex justify-center my-8 hidden">
+                    <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+                </div>
+            </main>
+
+            <!-- Live Updates Section -->
+            <aside id="liveUpdatesPanel" class="lg:w-1/3 hidden">
+                <div class="bg-white rounded-lg shadow-md p-4 sticky top-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold">Live Updates</h2>
+                        <button id="closeLiveUpdates" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div id="updatesContainer" class="space-y-3 max-h-[80vh] overflow-y-auto">
+                        <!-- Updates will be shown here -->
+                    </div>
+                </div>
+            </aside>
+        </div>
     </div>
 
+    <script>
+        // Configuration
+        const API_BASE_URL = 'https://hacker-news.firebaseio.com/v0';
+        const POSTS_PER_PAGE = 10;
+        const UPDATE_INTERVAL = 5000; // 5 seconds
+        
+        // State
+        let currentPostType = 'top';
+        let currentPage = 0;
+        let isLoading = false;
+        let lastUpdateTime = 0;
+        let updateCount = 0;
+        let liveUpdatesEnabled = false;
+        let updateInterval;
+        let pollsSearchStats = { storiesChecked: 0, pollsFound: 0 };
+        
+        // DOM Elements
+        const postsContainer = document.getElementById('postsContainer');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const liveUpdatesBtn = document.getElementById('liveUpdatesBtn');
+        const liveUpdatesPanel = document.getElementById('liveUpdatesPanel');
+        const closeLiveUpdates = document.getElementById('closeLiveUpdates');
+        const updatesContainer = document.getElementById('updatesContainer');
+        const notificationBadge = document.getElementById('notificationBadge');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPosts();
+            setupEventListeners();
+        });
+        
+        // Event Listeners
+        function setupEventListeners() {
+            // Tab navigation
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    currentPostType = button.dataset.type;
+                    currentPage = 0;
+                    postsContainer.innerHTML = '';
+                    console.log('Switching to:', currentPostType);
+                    
+                    // Reset polls search stats when switching to polls
+                    if (currentPostType === 'poll') {
+                        pollsSearchStats = { storiesChecked: 0, pollsFound: 0 };
+                    }
+                    
+                    loadPosts();
+                    
+                    // Update active tab
+                    tabButtons.forEach(btn => btn.classList.remove('bg-orange-600'));
+                    button.classList.add('bg-orange-600');
+                });
+            });
+            
+            // Infinite scroll
+            window.addEventListener('scroll', debounce(() => {
+                const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+                
+                if (scrollTop + clientHeight >= scrollHeight - 100 && !isLoading) {
+                    currentPage++;
+                    loadPosts();
+                }
+            }, 200));
+            
+            // Live updates toggle
+            liveUpdatesBtn.addEventListener('click', toggleLiveUpdates);
+            closeLiveUpdates.addEventListener('click', toggleLiveUpdates);
+        }
+        
+        // Load posts based on current type and page
+        async function loadPosts() {
+            isLoading = true;
+            loadingSpinner.classList.remove('hidden');
+            
+            try {
+                let postIds;
+                
+                // Get appropriate post IDs based on type
+                switch (currentPostType) {
+                    case 'top':
+                        postIds = await fetchData(`${API_BASE_URL}/topstories.json`);
+                        break;
+                    case 'new':
+                        postIds = await fetchData(`${API_BASE_URL}/newstories.json`);
+                        break;
+                    case 'ask':
+                        postIds = await fetchData(`${API_BASE_URL}/askstories.json`);
+                        break;
+                    case 'show':
+                        postIds = await fetchData(`${API_BASE_URL}/showstories.json`);
+                        break;
+                    case 'poll':
+                        // For polls, we need to fetch from multiple sources and filter
+                        const [topStories, newStories] = await Promise.all([
+                            fetchData(`${API_BASE_URL}/topstories.json`),
+                            fetchData(`${API_BASE_URL}/newstories.json`)
+                        ]);
+                        // Combine and remove duplicates
+                        const allStories = [...new Set([...topStories, ...newStories])];
+                        postIds = allStories;
+                        break;
+                    case 'job':
+                        postIds = await fetchData(`${API_BASE_URL}/jobstories.json`);
+                        break;
+                    default:
+                        postIds = await fetchData(`${API_BASE_URL}/topstories.json`);
+                }
+                
+                // Calculate range of posts to fetch
+                let start = currentPage * POSTS_PER_PAGE;
+                let end = start + POSTS_PER_PAGE;
+                
+                // For polls, we need to fetch more stories to find enough polls
+                if (currentPostType === 'poll') {
+                    start = 0;
+                    end = Math.max(50, (currentPage + 1) * POSTS_PER_PAGE * 5); // Fetch more stories to find polls
+                    console.log('Loading polls. Fetching stories from', start, 'to', end);
+                    
+                    // Show progress for polls search
+                    if (currentPage === 0) {
+                        const progressMessage = document.createElement('div');
+                        progressMessage.className = 'bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded mb-4';
+                        progressMessage.innerHTML = `
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-search"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm">
+                                        <strong>Searching for polls...</strong> Checking the first ${end} stories from HackerNews.
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+                        postsContainer.appendChild(progressMessage);
+                    }
+                }
+                
+                // Ensure we get the correct slice for proper ordering
+                const currentPostIds = postIds.slice(start, end);
+                console.log('Fetching posts from position', start, 'to', end, 'of', postIds.length, 'total posts');
+                console.log('Fetching', currentPostIds.length, 'posts');
+                
+                // Fetch post details in parallel
+                const posts = await Promise.all(
+                    currentPostIds.map(id => fetchData(`${API_BASE_URL}/item/${id}.json`))
+                );
+                
+                // Debug: Log the first few posts with their scores
+                if (currentPostType === 'top' && currentPage === 0) {
+                    console.log('Top posts scores:', posts.slice(0, 5).map(p => ({ title: p.title, score: p.score })));
+                }
+                
+                // Filter out null posts
+                let validPosts = posts.filter(post => post !== null);
+                
+                // Filter by type if needed (for polls)
+                if (currentPostType === 'poll') {
+                    console.log('Filtering for polls. Total posts before filter:', validPosts.length);
+                    console.log('Posts types found:', validPosts.map(p => p.type));
+                    
+                    // Update search stats
+                    pollsSearchStats.storiesChecked += validPosts.length;
+                    
+                    validPosts = validPosts.filter(post => post.type === 'poll');
+                    pollsSearchStats.pollsFound += validPosts.length;
+                    
+                    console.log('Polls found:', validPosts.length);
+                    console.log('Polls:', validPosts);
+                    console.log('Search stats:', pollsSearchStats);
+                    
+                    if (validPosts.length === 0) {
+                        // Remove progress message if it exists
+                        const progressMessage = postsContainer.querySelector('.bg-blue-50');
+                        if (progressMessage) {
+                            progressMessage.remove();
+                        }
+                        
+                        const noPollsMessage = document.createElement('div');
+                        noPollsMessage.className = 'bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded mb-4';
+                        noPollsMessage.innerHTML = `
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-info-circle"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm">
+                                        <strong>No polls found in the first ${end} stories.</strong> 
+                                        <br>Search stats: ${pollsSearchStats.storiesChecked} stories checked, ${pollsSearchStats.pollsFound} polls found.
+                                        <br>Polls are rare on HackerNews. 
+                                        <button onclick="loadMoreForPolls()" class="text-blue-600 hover:text-blue-800 font-medium underline ml-1">
+                                            Load more stories to search for polls
+                                        </button>
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+                        postsContainer.appendChild(noPollsMessage);
+                    } else {
+                        // Remove progress message if polls were found
+                        const progressMessage = postsContainer.querySelector('.bg-blue-50');
+                        if (progressMessage) {
+                            progressMessage.remove();
+                        }
+                        
+                        // Show success message with stats
+                        const successMessage = document.createElement('div');
+                        successMessage.className = 'bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded mb-4';
+                        successMessage.innerHTML = `
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm">
+                                        <strong>Found ${validPosts.length} poll(s)!</strong> 
+                                        <br>Search stats: ${pollsSearchStats.storiesChecked} stories checked, ${pollsSearchStats.pollsFound} polls found.
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+                        postsContainer.insertBefore(successMessage, postsContainer.firstChild);
+                    }
+                }
+                
+                renderPosts(validPosts);
+                
+            } catch (error) {
+                console.error('Error loading posts:', error);
+                showError('Failed to load posts. Please try again.');
+            } finally {
+                isLoading = false;
+                loadingSpinner.classList.add('hidden');
+            }
+        }
+        
+        // Render posts to the DOM
+        function renderPosts(posts) {
+            posts.forEach((post, index) => {
+                // Calculate the actual position in the list
+                const actualIndex = currentPage * POSTS_PER_PAGE + index;
+                const postElement = createPostElement(post, actualIndex);
+                postsContainer.appendChild(postElement);
+            });
+        }
+        
+        // Create HTML for a single post
+        function createPostElement(post, index = 0) {
+            const postDiv = document.createElement('div');
+            postDiv.className = 'bg-white rounded-lg shadow-md p-4 fade-in';
+            
+            let postContent = '';
+            
+            if (post.type === 'job') {
+                postContent = `
+                    <div class="flex items-start">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                <a href="${post.url || '#'}" target="_blank" rel="noopener noreferrer" class="hover:text-orange-500">
+                                    ${post.title}
+                                </a>
+                            </h3>
+                            <div class="text-sm text-gray-500 mt-1">
+                                <span>${post.by}</span>
+                                <span class="mx-2">•</span>
+                                <span>${new Date(post.time * 1000).toLocaleString()}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            ${currentPostType === 'top' ? `<span class="text-xs text-gray-500">#${index + 1}</span>` : ''}
+                            <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Job</span>
+                        </div>
+                    </div>
+                `;
+            } else if (post.type === 'poll') {
+                postContent = `
+                    <div class="flex items-start">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                ${post.title}
+                            </h3>
+                            <div class="text-sm text-gray-500 mt-1">
+                                <span>${post.by}</span>
+                                <span class="mx-2">•</span>
+                                <span>${new Date(post.time * 1000).toLocaleString()}</span>
+                                <span class="mx-2">•</span>
+                                <span>${post.score || 0} points</span>
+                                <span class="mx-2">•</span>
+                                <span>${post.descendants || 0} comments</span>
+                            </div>
+                            <div class="mt-2">
+                                <button onclick="loadPollOptions(${post.id})" class="text-orange-500 hover:text-orange-600 text-sm font-medium">
+                                    View Poll Options
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            ${currentPostType === 'top' ? `<span class="text-xs text-gray-500">#${index + 1}</span>` : ''}
+                            <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">Poll</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Story, Ask HN, Show HN
+                const isAskHN = post.type === 'story' && post.title && post.title.startsWith('Ask HN:');
+                const isShowHN = post.type === 'story' && post.title && post.title.startsWith('Show HN:');
+                
+                postContent = `
+                    <div class="flex items-start">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                <a href="${post.url || `#${post.id}`}" target="_blank" rel="noopener noreferrer" class="hover:text-orange-500">
+                                    ${post.title}
+                                </a>
+                            </h3>
+                            <div class="text-sm text-gray-500 mt-1">
+                                <span>${post.by}</span>
+                                <span class="mx-2">•</span>
+                                <span>${new Date(post.time * 1000).toLocaleString()}</span>
+                                <span class="mx-2">•</span>
+                                <span>${post.score || 0} points</span>
+                                <span class="mx-2">•</span>
+                                <span>${post.descendants || 0} comments</span>
+                            </div>
+                            ${post.text ? `<div class="mt-2 text-gray-700 prose">${post.text}</div>` : ''}
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            ${currentPostType === 'top' ? `<span class="text-xs text-gray-500">#${index + 1}</span>` : ''}
+                            <span class="${isAskHN ? 'bg-blue-100 text-blue-800' : isShowHN ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'} text-xs px-2 py-1 rounded-full">
+                                ${isAskHN ? 'Ask HN' : isShowHN ? 'Show HN' : 'Story'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button onclick="loadComments(${post.id})" class="text-orange-500 hover:text-orange-600 text-sm font-medium">
+                            View Comments
+                        </button>
+                    </div>
+                `;
+            }
+            
+            postDiv.innerHTML = postContent;
+            return postDiv;
+        }
+        
+        // Load comments for a post
+        async function loadComments(postId) {
+            try {
+                console.log('💬 Loading comments for post:', postId);
+                const post = await fetchData(`${API_BASE_URL}/item/${postId}.json`);
+                
+                if (!post.kids || post.kids.length === 0) {
+                    console.log('❌ No comments available for this post');
+                    alert('No comments available for this post.');
+                    return;
+                }
+                
+                console.log('📝 Found', post.kids.length, 'comments for post');
+                
+                // Find the post element
+                const postElement = document.querySelector(`[onclick="loadComments(${postId})"]`).closest('.bg-white');
+                
+                // Create comments container
+                const commentsContainer = document.createElement('div');
+                commentsContainer.className = 'mt-4 border-t pt-4';
+                commentsContainer.id = `comments-${postId}`;
+                
+                // Add loading indicator
+                commentsContainer.innerHTML = `
+                    <div class="flex justify-center py-4">
+                        <div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-500"></div>
+                    </div>
+                `;
+                
+                // Insert comments container
+                const existingComments = postElement.querySelector(`#comments-${postId}`);
+                if (existingComments) {
+                    existingComments.remove();
+                } else {
+                    postElement.appendChild(commentsContainer);
+                }
+                
+                // Fetch top-level comments
+                const commentPromises = post.kids.slice(0, 10).map(commentId => 
+                    fetchData(`${API_BASE_URL}/item/${commentId}.json`)
+                );
+                
+                const comments = await Promise.all(commentPromises);
+                const validComments = comments.filter(comment => comment !== null && !comment.deleted);
+                
+                // Render comments
+                if (validComments.length === 0) {
+                    commentsContainer.innerHTML = '<p class="text-gray-500">No comments available.</p>';
+                    return;
+                }
+                
+                commentsContainer.innerHTML = '<h4 class="font-medium text-gray-700 mb-3">Comments:</h4>';
+                validComments.forEach(comment => {
+                    const commentElement = createCommentElement(comment);
+                    commentsContainer.appendChild(commentElement);
+                    
+                    // Check if content is scrollable and hide/show indicator
+                    setTimeout(() => {
+                        const commentContainer = commentElement.querySelector('.comment-container');
+                        const indicator = commentElement.querySelector('.scrollable-indicator');
+                        if (commentContainer && indicator) {
+                            if (commentContainer.scrollWidth <= commentContainer.clientWidth) {
+                                indicator.style.display = 'none';
+                            }
+                        }
+                    }, 100);
+                });
+                
+            } catch (error) {
+                console.error('Error loading comments:', error);
+                showError('Failed to load comments. Please try again.');
+            }
+        }
+        
+        // Create HTML for a single comment
+        function createCommentElement(comment, depth = 0) {
+            console.log('📝 Creating comment element:', comment.id, 'depth:', depth);
+            const commentDiv = document.createElement('div');
+            commentDiv.className = 'mb-4';
+            
+            // Apply indentation based on depth
+            if (depth > 0) {
+                commentDiv.style.marginLeft = `${depth * 1.5}rem`;
+                commentDiv.style.borderLeft = '2px solid #e5e7eb';
+                commentDiv.style.paddingLeft = '1rem';
+                console.log('📏 Applied indentation for depth:', depth, 'marginLeft:', `${depth * 1.5}rem`);
+            }
+            
+            // Handle deleted comments
+            if (comment.deleted) {
+                console.log('🗑️ Comment is deleted');
+                commentDiv.innerHTML = '<p class="text-gray-400 italic">[deleted]</p>';
+                return commentDiv;
+            }
+            
+            commentDiv.innerHTML = `
+                <div class="bg-gray-50 p-3 rounded-md w-full comment-container relative">
+                    <div class="text-sm text-gray-500 mb-2">
+                        <span class="font-medium">${comment.by}</span>
+                        <span class="mx-2">•</span>
+                        <span>${new Date(comment.time * 1000).toLocaleString()}</span>
+                    </div>
+                    <div class="text-gray-700 prose comment-text">${comment.text || ''}</div>
+                    <div class="scrollable-indicator">→</div>
+                    ${comment.kids && comment.kids.length > 0 ? `
+                        <div class="mt-2">
+                            <button onclick="loadChildComments(${comment.id}, ${depth + 1}, this)" class="text-orange-500 hover:text-orange-600 text-xs font-medium">
+                                ${comment.kids.length} ${comment.kids.length === 1 ? 'reply' : 'replies'}
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            return commentDiv;
+        }
+        
+        // Load child comments (replies)
+        async function loadChildComments(commentId, depth, buttonElement) {
+            try {
+                console.log('🔄 Loading child comments for comment:', commentId);
+                const comment = await fetchData(`${API_BASE_URL}/item/${commentId}.json`);
+                
+                if (!comment.kids || comment.kids.length === 0) {
+                    console.log('❌ No child comments found');
+                    buttonElement.remove();
+                    return;
+                }
+                
+                console.log('📝 Found', comment.kids.length, 'child comments');
+                
+                // Find the parent comment BEFORE replacing the button
+                const parentComment = buttonElement.closest('.mb-4');
+                
+                // Create container for child comments
+                const container = document.createElement('div');
+                container.className = 'mt-3';
+                container.style.position = 'relative';
+                
+                // Replace button with loading spinner
+                buttonElement.outerHTML = `
+                    <div class="flex justify-center py-2">
+                        <div class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-orange-500"></div>
+                    </div>
+                `;
+                
+                // Fetch child comments
+                const childCommentPromises = comment.kids.map(kidId => 
+                    fetchData(`${API_BASE_URL}/item/${kidId}.json`)
+                );
+                
+                const childComments = await Promise.all(childCommentPromises);
+                const validChildComments = childComments.filter(c => c !== null && !c.deleted);
+                
+                console.log('✅ Loaded', validChildComments.length, 'valid child comments');
+                
+                // Render child comments
+                validChildComments.forEach(childComment => {
+                    console.log('🎯 Creating child comment with depth:', depth + 1);
+                    const childElement = createCommentElement(childComment, depth + 1);
+                    container.appendChild(childElement);
+                    
+                    // Check if content is scrollable and hide/show indicator
+                    setTimeout(() => {
+                        const commentContainer = childElement.querySelector('.comment-container');
+                        const indicator = childElement.querySelector('.scrollable-indicator');
+                        if (commentContainer && indicator) {
+                            if (commentContainer.scrollWidth <= commentContainer.clientWidth) {
+                                indicator.style.display = 'none';
+                            }
+                        }
+                    }, 100);
+                });
+                
+                // Insert after parent comment
+                parentComment.appendChild(container);
+                
+                // Remove the loading spinner
+                const spinner = parentComment.querySelector('.flex.justify-center.py-2');
+                if (spinner) {
+                    spinner.remove();
+                }
+                
+            } catch (error) {
+                console.error('❌ Error loading child comments:', error);
+                showError('Failed to load replies. Please try again.');
+            }
+        }
+        
+        // Load poll options
+        async function loadPollOptions(pollId) {
+            try {
+                const poll = await fetchData(`${API_BASE_URL}/item/${pollId}.json`);
+                
+                if (!poll.parts || poll.parts.length === 0) {
+                    alert('No poll options available.');
+                    return;
+                }
+                
+                // Find the poll element
+                const pollElement = document.querySelector(`[onclick="loadPollOptions(${pollId})"]`).closest('.bg-white');
+                
+                // Create poll options container
+                const optionsContainer = document.createElement('div');
+                optionsContainer.className = 'mt-4 border-t pt-4';
+                optionsContainer.id = `poll-options-${pollId}`;
+                
+                // Add loading indicator
+                optionsContainer.innerHTML = `
+                    <div class="flex justify-center py-4">
+                        <div class="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-orange-500"></div>
+                    </div>
+                `;
+                
+                // Insert options container
+                const existingOptions = pollElement.querySelector(`#poll-options-${pollId}`);
+                if (existingOptions) {
+                    existingOptions.remove();
+                } else {
+                    pollElement.appendChild(optionsContainer);
+                }
+                
+                // Fetch poll options
+                const optionPromises = poll.parts.map(optionId => 
+                    fetchData(`${API_BASE_URL}/item/${optionId}.json`)
+                );
+                
+                const options = await Promise.all(optionPromises);
+                const validOptions = options.filter(option => option !== null);
+                
+                // Render options
+                if (validOptions.length === 0) {
+                    optionsContainer.innerHTML = '<p class="text-gray-500">No poll options available.</p>';
+                    return;
+                }
+                
+                optionsContainer.innerHTML = `
+                    <h4 class="font-medium text-gray-700 mb-3">Poll Options:</h4>
+                    <div class="space-y-2">
+                        ${validOptions.map(option => `
+                            <div class="bg-gray-50 p-3 rounded-md">
+                                <div class="text-gray-700">${option.text}</div>
+                                <div class="text-sm text-gray-500 mt-1">${option.score || 0} points</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Error loading poll options:', error);
+                showError('Failed to load poll options. Please try again.');
+            }
+        }
+        
+        // Toggle live updates
+        function toggleLiveUpdates() {
+            liveUpdatesEnabled = !liveUpdatesEnabled;
+            
+            if (liveUpdatesEnabled) {
+                console.log('🟢 Live Updates ENABLED');
+                liveUpdatesPanel.classList.remove('hidden');
+                liveUpdatesBtn.classList.add('bg-orange-600', 'text-white');
+                startLiveUpdates();
+            } else {
+                console.log('🔴 Live Updates DISABLED');
+                liveUpdatesPanel.classList.add('hidden');
+                liveUpdatesBtn.classList.remove('bg-orange-600', 'text-white');
+                stopLiveUpdates();
+            }
+        }
+        
+        // Start live updates
+        function startLiveUpdates() {
+            console.log('🚀 Starting Live Updates with interval:', UPDATE_INTERVAL, 'ms');
+            // Clear any existing interval
+            if (updateInterval) clearInterval(updateInterval);
+            
+            // Initial check
+            checkForUpdates();
+            
+            // Set up interval
+            updateInterval = setInterval(checkForUpdates, UPDATE_INTERVAL);
+            console.log('⏰ Live Updates interval set');
+        }
+        
+        // Stop live updates
+        function stopLiveUpdates() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
+            updateCount = 0;
+            notificationBadge.classList.add('hidden');
+        }
+        
+        // Check for new updates
+        async function checkForUpdates() {
+            try {
+                console.log('🔍 Checking for updates...');
+                const newStories = await fetchData(`${API_BASE_URL}/newstories.json`);
+                const newestStory = await fetchData(`${API_BASE_URL}/item/${newStories[0]}.json`);
+                
+                console.log('📰 Newest story time:', new Date(newestStory.time * 1000).toLocaleString());
+                console.log('⏰ Last update time:', new Date(lastUpdateTime * 1000).toLocaleString());
+                
+                if (newestStory.time > lastUpdateTime) {
+                    console.log('✅ New update found!');
+                    // New update found
+                    lastUpdateTime = newestStory.time;
+                    updateCount++;
+                    
+                    // Update notification badge
+                    notificationBadge.textContent = updateCount;
+                    notificationBadge.classList.remove('hidden');
+                    
+                    // Add update to panel (include polls)
+                    addUpdate(newestStory);
+                } else {
+                    console.log('❌ No new updates found');
+                }
+                
+                // Also check for new polls specifically
+                const topStories = await fetchData(`${API_BASE_URL}/topstories.json`);
+                const recentStories = await Promise.all(
+                    topStories.slice(0, 10).map(id => fetchData(`${API_BASE_URL}/item/${id}.json`))
+                );
+                
+                const newPolls = recentStories.filter(story => 
+                    story && story.type === 'poll' && story.time > lastUpdateTime
+                );
+                
+                if (newPolls.length > 0) {
+                    newPolls.forEach(poll => {
+                        updateCount++;
+                        notificationBadge.textContent = updateCount;
+                        notificationBadge.classList.remove('hidden');
+                        addUpdate(poll);
+                    });
+                }
+            } catch (error) {
+                console.error('Error checking for updates:', error);
+            }
+        }
+        
+        // Add an update to the live updates panel
+        function addUpdate(story) {
+            console.log('📝 Adding update:', story.title);
+            const updateElement = document.createElement('div');
+            updateElement.className = 'bg-orange-50 p-3 rounded-md border border-orange-100 fade-in';
+            
+            // Determine the type badge
+            let typeBadge = '';
+            if (story.type === 'poll') {
+                typeBadge = '<span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full ml-2">Poll</span>';
+            } else if (story.type === 'job') {
+                typeBadge = '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full ml-2">Job</span>';
+            }
+            
+            updateElement.innerHTML = `
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="text-sm text-gray-500 mb-1">
+                            ${new Date(story.time * 1000).toLocaleTimeString()}
+                        </div>
+                        <h4 class="font-medium text-gray-800">
+                            <a href="${story.url || `#${story.id}`}" target="_blank" rel="noopener noreferrer" class="hover:text-orange-500">
+                                ${story.title}
+                            </a>
+                        </h4>
+                        <div class="text-xs text-gray-500 mt-1">
+                            <span>${story.by}</span>
+                            <span class="mx-2">•</span>
+                            <span>${story.score || 0} points</span>
+                        </div>
+                    </div>
+                    ${typeBadge}
+                </div>
+            `;
+            
+            // Prepend to show newest first
+            updatesContainer.insertBefore(updateElement, updatesContainer.firstChild);
+            
+            // Limit to 20 updates
+            if (updatesContainer.children.length > 20) {
+                updatesContainer.removeChild(updatesContainer.lastChild);
+            }
+        }
+        
+        // Helper function to fetch data
+        async function fetchData(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Network response was not ok');
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                return null;
+            }
+        }
+        
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4';
+            errorDiv.innerHTML = `
+                <strong>Error:</strong> ${message}
+                <button onclick="this.parentElement.remove()" class="float-right font-bold">×</button>
+            `;
+            postsContainer.appendChild(errorDiv);
+        }
+        
+        // Debounce function to limit API calls
+        function debounce(func, wait) {
+            let timeout;
+            return function() {
+                const context = this, args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    func.apply(context, args);
+                }, wait);
+            };
+        }
+        
+        // Load more stories specifically for polls search
+        async function loadMoreForPolls() {
+            if (currentPostType !== 'poll') return;
+            
+            currentPage++;
+            console.log('Loading more stories for polls search. Page:', currentPage);
+            
+            // Remove the "no polls found" message
+            const noPollsMessage = postsContainer.querySelector('.bg-yellow-50');
+            if (noPollsMessage) {
+                noPollsMessage.remove();
+            }
+            
+            // Add loading indicator
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.className = 'flex justify-center my-4';
+            loadingIndicator.innerHTML = `
+                <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500"></div>
+                <span class="ml-2 text-gray-600">Searching for polls...</span>
+            `;
+            postsContainer.appendChild(loadingIndicator);
+            
+            try {
+                await loadPosts();
+            } finally {
+                loadingIndicator.remove();
+            }
+        }
+        
+        // Make functions available globally for onclick handlers
+        window.loadComments = loadComments;
+        window.loadChildComments = loadChildComments;
+        window.loadPollOptions = loadPollOptions;
+        window.loadMoreForPolls = loadMoreForPolls;
+    </script>
 </body>
-
-<script type="module" src="./js/script.js"></script>
-
 </html>

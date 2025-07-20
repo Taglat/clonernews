@@ -29,4 +29,23 @@ footer {
 
 .container {
     padding: 10px 10px;
+    margin: 0 auto;
+}
+
+li {
+    list-style-type: none;
+}
+
+header nav {
+    display: flex;
+    gap: 10px;
+}
+
+header nav a {
+    color: black;
+}
+
+header nav a.active {
+    color: white;
+    font-weight: 700;
 }
