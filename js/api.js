@@ -41,7 +41,7 @@ async function getJobs() {
 // }
 
 async function getItemById(id) {
-    const res = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
+    const res = await fetch(`${BASE_URL}/item/${id}.json`);
     return await res.json();
 }
 
@@ -53,4 +53,9 @@ async function loadComments(ids) {
   })));
 }
 
-export { getNewStories, getTopStories, getJobs, getItemById, loadComments }
+async function getUpdates() {
+  const res = await fetch(`${BASE_URL}/updates.json`);
+  return await res.json();
+}
+
+export { getNewStories, getTopStories, getJobs, getItemById, loadComments, getUpdates }

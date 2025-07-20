@@ -12,13 +12,17 @@ export async function loadPage(ids, perPage, page) {
     renderPagination(ids.length, perPage, currentPage);
 }
 
-export function setupPaginationHandler(ids, perPage) {
+export function setupPaginationHandler(ids, perPage, onPageChange) {
   document.addEventListener("click", async e => {
     const btn = e.target.closest("[data-page]");
     if (!btn) return;
     e.preventDefault();
+    
+    const newPage = +btn.dataset.page;
+    onPageChange(newPage); // сообщаем наружу
+
     showLoader();
-    await loadPage(ids, perPage, +btn.dataset.page);
+    await loadPage(ids, perPage, newPage);
     hideLoader();
   });
 }

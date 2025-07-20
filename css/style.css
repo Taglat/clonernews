@@ -1,81 +1,84 @@
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-html, body {
-    height: 100%;
+html,
+body {
+  height: 100%;
 }
 
 .wrapper {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 header {
-    background-color: red;
+  background-color: red;
 }
 
 main {
-    flex-grow: 1;
+  flex-grow: 1;
 }
 
 footer {
-    background-color: blue;
+  background-color: blue;
 }
 
 .container {
-    padding: 10px 10px;
-    margin: 0 auto;
+  padding: 10px 10px;
+  margin: 0 auto;
 }
 
 li {
-    list-style-type: none;
+  list-style-type: none;
 }
 
 header nav {
-    display: flex;
-    gap: 10px;
+  display: flex;
+  gap: 10px;
 }
 
 header nav a {
-    color: black;
+  color: black;
 }
 
 header nav a.active {
-    color: white;
-    font-weight: 700;
+  color: white;
+  font-weight: 700;
 }
 
-.story, .job, .generic {
+.story,
+.job,
+.generic {
   border: 1px solid #ccc;
   padding: 1em;
   margin-bottom: 1em;
 }
 
-footer a { 
-  color:#000; 
-  text-decoration:none; 
-} 
-
-footer a:hover { 
-  text-decoration:underline; 
+footer a {
+  color: #000;
+  text-decoration: none;
 }
 
-.comment { 
-  margin: 8px 0; 
-} 
+footer a:hover {
+  text-decoration: underline;
+}
 
-.nested { 
-  margin-left: 16px; 
-  border-left: 1px solid #ddd; 
-  padding-left: 8px; 
-} 
+.comment {
+  margin: 8px 0;
+}
 
-.text p { 
-  margin: 4px 0; 
+.nested {
+  margin-left: 16px;
+  border-left: 1px solid #ddd;
+  padding-left: 8px;
+}
+
+.text p {
+  margin: 4px 0;
 }
 
 .comments-btn {
@@ -108,4 +111,12 @@ footer a:hover {
   border-radius: 4px;
   z-index: 999;
   font-weight: bold;
+}
+
+.updates {
+  display: none;
+  padding: 10px;
+  background: #ffd;
+  border: 1px solid #ccc;
+  margin-bottom: 10px;
 }
