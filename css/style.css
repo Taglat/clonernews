@@ -1,0 +1,32 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+}
+
+.wrapper {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    background-color: red;
+}
+
+main {
+    background-color: green;
+    flex-grow: 1;
+}
+
+footer {
+    background-color: blue;
+}
+
+.container {
+    padding: 10px 10px;
+}
