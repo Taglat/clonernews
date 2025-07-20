@@ -45,5 +45,12 @@ async function getItemById(id) {
     return await res.json();
 }
 
+async function loadComments(ids) {
+  const items = await Promise.all(ids.map(getItemById));
+  return Promise.all(items.map(async c => ({
+    ...c,
+    children: c.kids ? await loadComments(c.kids) : []
+  })));
+}
 
-export { getNewStories, getTopStories, getJobs, getItemById }
+export { getNewStories, getTopStories, getJobs, getItemById, loadComments }

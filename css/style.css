@@ -55,5 +55,44 @@ header nav a.active {
   margin-bottom: 1em;
 }
 
-footer a { color:#000; text-decoration:none; }
-footer a:hover { text-decoration:underline; }
+footer a { 
+  color:#000; 
+  text-decoration:none; 
+} 
+
+footer a:hover { 
+  text-decoration:underline; 
+}
+
+.comment { 
+  margin: 8px 0; 
+} 
+
+.nested { 
+  margin-left: 16px; 
+  border-left: 1px solid #ddd; 
+  padding-left: 8px; 
+} 
+
+.text p { 
+  margin: 4px 0; 
+}
+
+.comments-btn {
+  background: #007cba;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.comments-btn:hover {
+  background: #005a8b;
+}
+
+.comments {
+  margin-top: 10px;
+  border-left: 2px solid #ddd;
+  padding-left: 10px;
+}
