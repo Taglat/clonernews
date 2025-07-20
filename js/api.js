@@ -40,4 +40,10 @@ async function getJobs() {
 //     return data;
 // }
 
-export { getNewStories, getTopStories, getJobs }
+async function getItemById(id) {
+    const res = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
+    return await res.json();
+}
+
+
+export { getNewStories, getTopStories, getJobs, getItemById }
