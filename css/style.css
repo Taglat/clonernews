@@ -19,7 +19,6 @@ header {
 }
 
 main {
-    background-color: green;
     flex-grow: 1;
 }
 
@@ -48,4 +47,10 @@ header nav a {
 header nav a.active {
     color: white;
     font-weight: 700;
+}
+
+.story, .job, .generic {
+  border: 1px solid #ccc;
+  padding: 1em;
+  margin-bottom: 1em;
 }
