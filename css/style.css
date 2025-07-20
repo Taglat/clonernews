@@ -96,3 +96,16 @@ footer a:hover {
   border-left: 2px solid #ddd;
   padding-left: 10px;
 }
+
+#loader {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  padding: 8px 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  z-index: 999;
+  font-weight: bold;
+}

@@ -1,7 +1,9 @@
 import { loadComments } from "./api.js";
+import { hideLoader, showLoader } from "./loader.js";
 
 export function renderItems(items) {
   const container = document.querySelector("main .container");
+  showLoader();
   container.innerHTML = "";
   
   items.forEach(item => {
@@ -19,6 +21,8 @@ export function renderItems(items) {
     }
     container.appendChild(element);
   });
+
+  hideLoader();
 }
 
 function renderStoryItem(item) {
@@ -36,22 +40,24 @@ function renderStoryItem(item) {
   const commentsDiv = el.querySelector('.comments');
   
   btn.addEventListener('click', async () => {
-    if (commentsDiv.style.display === 'none') {
-      if (!item.kids || !item.kids.length) {
-        commentsDiv.innerHTML = '<p>No comments</p>';
-      } else {
-        commentsDiv.innerHTML = '<p>Loading comments...</p>';
-        const tree = await loadComments(item.kids);
-        commentsDiv.innerHTML = '';
-        renderComments(tree, commentsDiv);
-      }
-      commentsDiv.style.display = 'block';
-      btn.textContent = 'Hide Comments';
+  if (commentsDiv.style.display === 'none') {
+    if (!item.kids || !item.kids.length) {
+      commentsDiv.innerHTML = '<p>No comments</p>';
     } else {
-      commentsDiv.style.display = 'none';
-      btn.textContent = 'Show Comments';
+      showLoader();
+      const tree = await loadComments(item.kids);
+      hideLoader();
+      commentsDiv.innerHTML = '';
+      renderComments(tree, commentsDiv);
     }
-  });
+    commentsDiv.style.display = 'block';
+    btn.textContent = 'Hide Comments';
+  } else {
+    commentsDiv.style.display = 'none';
+    btn.textContent = 'Show Comments';
+  }
+});
+
   
   return el;
 }
