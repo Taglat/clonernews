@@ -1,23 +1,7 @@
 export function renderItems(items) {
-  const container = document.querySelector('main .container'); // находит <div class="container"> внутри <main>
-  container.innerHTML = ''; // очистить перед вставкой
-
-  items.forEach(item => {
-    let element;
-    switch (item.type) {
-      case 'story':
-        element = renderStoryItem(item);
-        break;
-      case 'job':
-        element = renderJobItem(item);
-        break;
-      default:
-        element = renderGenericItem(item);
-        break;
-    }
-
-    container.appendChild(element);
-  });
+  const container = document.querySelector("main .container");
+  container.innerHTML = "";
+  items.forEach(item => container.appendChild(renderStoryItem(item)));
 }
 
 
@@ -50,4 +34,21 @@ export function renderGenericItem(item) {
     <p>Тип: ${item.type}</p>
   `;
   return el;
+}
+
+
+export function renderPagination(total, perPage, current) {
+    const pages = Math.ceil(total / perPage);
+    const container = document.querySelector("footer .container");
+    container.innerHTML = "";
+
+    for (let p = 1; p <= pages; p++) {
+        const a = document.createElement("a");
+        a.href = "#";
+        a.dataset.page = p;
+        a.textContent = p;
+        if (p === current) a.style.fontWeight = "700";
+        a.style.margin = "0 4px";
+        container.appendChild(a);
+    }
 }

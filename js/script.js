@@ -1,24 +1,21 @@
-import {getNewStories, getTopStories, getJobs, getItemById } from "./api.js";
-import { renderItems } from "./render.js";
+import { getNewStories, getTopStories, getJobs } from "./api.js";
+import { loadPage } from "./pagination.js";
 
-const currentPagePath = window.location.pathname;
-
+const path = window.location.pathname;
 let ids = [];
 
-if (currentPagePath.endsWith("index.html")) {
-    ids = await getNewStories();
-} else if (currentPagePath.endsWith("top-stories.html")) {
-    ids = await getTopStories();
-} else if (currentPagePath.endsWith("jobs.html")) {
-    ids = await getJobs();
-}
+if (path.endsWith("index.html"))       ids = await getNewStories();
+else if (path.endsWith("top-stories.html")) ids = await getTopStories();
+else if (path.endsWith("jobs.html"))        ids = await getJobs();
 
-const page = 0;
 const perPage = 10;
+let currentPage = 1;
 
-const currentPageIds = ids.slice(page * perPage, (page + 1) * perPage);
-const items = await Promise.all(currentPageIds.map(id => getItemById(id)));
+await loadPage(ids, perPage, currentPage);
 
-renderItems(items);
-
-console.log(currentPagePath, items)
+document.addEventListener("click", e => {
+    const btn = e.target.closest("[data-page]");
+    if (!btn) return;
+    e.preventDefault();
+    loadPage(ids, perPage, +btn.dataset.page);
+});
